@@ -85,17 +85,11 @@ void MainClass::init_date()
     // Считываем матрицу ограничений
     read_matrix(matrix_lim);
     // Заполняем вектор функции Z
-    z << fract(2, 1) << fract(-1, 1) << fract(-1, 1) << fract(-1, 1);
+    z << fract(2, 1) << fract(11, 1);
     // Заполняем вектор знаков данными из дано
-    sinbol << '=' << '=' << '=';
+    sinbol << '>' << '>' << '>';
     // true - max / false - min
-    m_nx = true;
-
-    if (!m_nx) {
-        for (int i = 0; i < z.size(); i++) {
-            z[i].u_num *= -1;
-        }
-    }
+    m_nx = false;
     cout << endl;
     // Выводим дано
     cout << "Z = ";
@@ -247,7 +241,7 @@ void MainClass::check_origin_basis()
             gen_basis_x << 0;
         }
     }
-    int count_synt_basis = gen_basis.size();
+    count_synt_basis = gen_basis.size();
     // Сколько нужно искуственных базисов
     for (int i = 0; i < gen_basis.size(); i++) {
         if (gen_basis[i] == 1) {
@@ -333,11 +327,17 @@ bool MainClass::check_opti(QVector<QVector<fract>> table)
 {
     // Проверка оптимальности по Z
     for (int i = 0; i < table[table.size() - 1].size() - 1; i++) {
-        if (table[table.size() - 1][i].u_num < 0) {
-            return false;
+            if (m_nx) {
+                if (table[table.size() - 1][i].u_num < 0) {
+                    return false;
+                }
+            } else {
+                if (table[table.size() - 1][i].u_num > 0) {
+                    return false;
+                }
+            }
         }
-    }
-    return true;
+        return true;
 }
 
 bool MainClass::check_opt_m()
@@ -403,7 +403,7 @@ void MainClass::calculate_m_vec(QVector<QVector<fract>> table)
 void MainClass::show_answer(QVector<QVector<fract>> table){
     cout << "Z = (";
     bool flag = false;
-    for(int i = 0; i < table[0].size() - 1; i++){
+    for(int i = 0; i < table[0].size() - 1 - count_synt_basis; i++){
         for(int j = 0; j < gen_basis_index.size(); j++){
             if(i == gen_basis_index[j]){
                 for(int g = 0; g < gen_basis_index.size(); g++){
@@ -419,19 +419,14 @@ void MainClass::show_answer(QVector<QVector<fract>> table){
         } else {
             flag = false;
         }
-        if(i < table[0].size() - 2){
+        if(i < table[0].size() - 2 - count_synt_basis){
             cout << ", ";
         } else {
             cout << ") = ";
         }
     }
-    if(m_nx){
         cout_fract(table[table.size() - 1][table[0].size() - 1]);
         cout << endl;
-    } else {
-        cout_fract(fract(table[table.size() - 1][table[0].size() - 1].u_num * -1, table[table.size() - 1][table[0].size() - 1].d_num));
-        cout << endl;
-    }
 
 }
 
@@ -521,28 +516,25 @@ void MainClass::simplex_method()
         }
         // Оперделяем ведущую строку
         tim = cur_tim = fract(0, 1);
-        for (int i = 0; i < table.size() - 1; i++) {
-            if (table[i][master_col].u_num != 0) {
-                // Если это первый проверяемый элемент или предыдущий элемент не подходит,
-                // то записываем первый тим, иначе записывем второй тим.
-                if (i == 0 || tim.u_num <= 0) {
-                    tim = frct.mult(table[i][table[i].size() - 1], table[i][master_col], 1);
-                } else {
-                    cur_tim = frct.mult(table[i][table[i].size() - 1], table[i][master_col], 1);
+        //Находим первое неотрицательное отношение B и ведущего столбца
+                for (int i = 0; i < table.size() - 1; i++) {
+                    if (table[i][master_col].u_num != 0 && (table[i][table[i].size() - 1].u_num * table[i][master_col].u_num) > 0) {
+                        tim = frct.mult(table[i][table[i].size() - 1], table[i][master_col], 1);
+                        master_row = i;
+                        break;
+                    }
                 }
+                //Проходим по всем оставшимся строкам, выбирая наименьшее положительное отношение B и ведущего столбца
+                for (int i = master_row; i < table.size() - 1; i++) {
 
-                if (tim > cur_tim && cur_tim.u_num > 0) {
-                    master_row = i;
-                    tim = cur_tim;
+                    if (table[i][table[i].size() - 1].u_num * table[i][master_col].u_num > 0) {
+                        cur_tim = frct.mult(table[i][table[i].size() - 1], table[i][master_col], 1);
+                        if (cur_tim < tim) {
+                            master_row = i;
+                            tim = cur_tim;
+                        }
+                    }
                 }
-                if (tim.u_num > 0 && cur_tim.u_num <= 0) {
-                    master_row = i;
-                }
-            }
-        }
-//        if(!check_solution(table)){
-//            break;
-//        }
         // Делим строку на ведущий элемент table[master_row][master_col]
         cur_mult_tim = table[master_row][master_col];
         for (int i = 0; i < table[0].size(); i++) {
@@ -557,7 +549,6 @@ void MainClass::simplex_method()
                 }
             }
         }
-//        cout << "MASTER_row = " << master_row << " MASTER_col = " << master_col << endl;
 
         if (!m.isEmpty()) {
             cur_mult_tim = m[master_col];

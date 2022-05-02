@@ -24,6 +24,7 @@ public:
 
 private:
     bool m_nx;
+    int count_synt_basis;
     QVector<fract> z;
     QVector<fract> m;
     QVector<QChar> sinbol;
